@@ -200,12 +200,7 @@ void DMA1_Channel6_IRQHandler(void)
   */
 void DMA1_Channel7_IRQHandler(void)
 {
-	if (DMA_GetITStatus(DMA1_IT_TC7) == SET) {
-		if (DMA_usart_tx_flag) {
-			DMA_usart_tx_flag = 0;
-		}
-		DMA_ClearFlag(DMA1_IT_TC7);
-	}
+
 }
 /**
   * @}

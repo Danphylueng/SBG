@@ -20,10 +20,9 @@
 static uint8_t g_DMA_rx_buffer[DMA_RECEIVEBUFF_SIZE]; /*!< use to hold the receive data throngh DMA */
 static uint8_t g_DMA_tx_buffer[DMA_SENDBUFF_SIZE];		/*!< use to hold the data that use to send    */
 __IO u8 DMA_rx_page = 0;															/*!< increase 1 when DMA receive transmit complete */
-__IO u8 DMA_usart_tx_flag = 0;												/*!< use to judge whether send dma is free or not when it == 1,dma is busy */
 
-extern u8 _g_receive_buffer[RECEIVE_BUFFER_LEN];			/*!< a buffer to receive the data */
-extern u8 *p;																					/*!< a ponter point to the buffer to save data */
+
+
 
 
 /// 配置USART1接收中断
@@ -66,7 +65,7 @@ void USART2_Config(void)
 		GPIO_Init(GPIOA, &GPIO_InitStructure);
 			
 		/* USART1 mode config */
-		USART_InitStructure.USART_BaudRate = 115200;
+		USART_InitStructure.USART_BaudRate = 921600;
 		USART_InitStructure.USART_WordLength = USART_WordLength_8b;
 		USART_InitStructure.USART_StopBits = USART_StopBits_1;
 		USART_InitStructure.USART_Parity = USART_Parity_No ;
@@ -77,6 +76,7 @@ void USART2_Config(void)
 
 		USART_DMACmd(USART2, USART_DMAReq_Rx|USART_DMAReq_Tx, ENABLE);
 		USART2_rx_DMA_Config();
+		USART2_tx_DMA_Config();
 		NVIC_Configuration();
 		USART_Cmd(USART2, ENABLE);
 }
@@ -142,7 +142,7 @@ void USART2_rx_DMA_Config(void)
   * @param  无
   * @retval 无
   */
-void USART2_tx_DMA_Config(u16 len)
+void USART2_tx_DMA_Config(void)
 {
 		DMA_InitTypeDef DMA_InitStructure;
 		DMA_DeInit(USART2_DMA_CHAN_TX);      
@@ -159,7 +159,7 @@ void USART2_tx_DMA_Config(u16 len)
 		DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST ;	
 
 		/*传输大小DMA_BufferSize=SENDBUFF_SIZE*/	
-		DMA_InitStructure.DMA_BufferSize = len;
+		DMA_InitStructure.DMA_BufferSize = 1;
 
 		/*外设地址不增*/	    
 		DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable; 
@@ -188,7 +188,7 @@ void USART2_tx_DMA_Config(u16 len)
 		
 		/*使能DMA*/
 		DMA_Cmd (USART2_DMA_CHAN_TX, ENABLE);					
-		DMA_ITConfig(USART2_DMA_CHAN_TX, DMA_IT_TC, ENABLE);  //配置DMA发送完成后产生中断
+		//DMA_ITConfig(USART2_DMA_CHAN_TX, DMA_IT_TC, ENABLE);  //配置DMA发送完成后产生中断
 }
 
 /**
@@ -211,24 +211,22 @@ u16 read_from_DMAbuffer(u8 *p, u32 len)
 	
 	DE_PRINTF("old = %d new = %d", old_page, DMA_rx_page);
 	if(DMA_rx_page == old_page ){												 /* this case is in the same section */
+	
+		num = DMA_GetCurrDataCounter(USART2_DMA_CHAN_RX) + read_offset;
 		
-		num = DMA_RECEIVEBUFF_SIZE - DMA_GetCurrDataCounter(USART2_DMA_CHAN_RX) - read_offset;					/* calculate how many data we can read in DMA_buffer */
-		
-		if (num > len) {																	/*this case is the data we can receive bigger than len*/
+		if(num > DMA_RECEIVEBUFF_SIZE){																/* the page change num > DMA_RECEIVEBUFF_SIZE */
 			
-			/*****************************************************************
-				this case will hanppen something unexcepted , so we judge.
-				sometimes,it will happen DMA_rx_page add one in interrupt after judge.
-			******************************************************************/
-			if (DMA_RECEIVEBUFF_SIZE - 3 <= read_offset && DMA_GetCurrDataCounter(USART2_DMA_CHAN_RX) >= 3)	{		
-				
-				u16 retval = 0;
-				retval = DMA_RECEIVEBUFF_SIZE - read_offset;
-				memcpy(p,  g_DMA_rx_buffer + read_offset, retval);
-				read_offset = 0;
-				old_page = DMA_rx_page;
-				return retval;
-			}
+			u16 retval = 0;
+			retval = DMA_RECEIVEBUFF_SIZE - read_offset;
+			memcpy(p,  g_DMA_rx_buffer + read_offset, retval);
+			read_offset = 0;
+			old_page = DMA_rx_page;
+			return retval;			
+		} else {
+			
+			num = DMA_RECEIVEBUFF_SIZE - num ;
+		}
+		if (num > len) {																	/*this case is the data we can receive bigger than len*/
 			
 			memcpy(p, g_DMA_rx_buffer + read_offset, len);
 			read_offset += len;
@@ -275,7 +273,7 @@ u16 read_from_DMAbuffer(u8 *p, u32 len)
 			if (len >= num1 +num2) {													/* have enough space to store the data */
 				
 				memcpy(p, g_DMA_rx_buffer + read_offset, num1);
-				memcpy(p, g_DMA_rx_buffer, num2);
+				memcpy(p + num1, g_DMA_rx_buffer, num2);
 				read_offset = num2;
 				old_page = DMA_rx_page;														/* updata the page */
 				DE_PRINTF("the data hasn't been coverted, return num1 + num2 = %d \n", num1 +num2);
@@ -284,7 +282,7 @@ u16 read_from_DMAbuffer(u8 *p, u32 len)
 			} else if(len >= num1 && len < num2 +num1){				/* don't have enough space but can move read_offet to the head of the g_DMA_rx_buffer */
 				
 				memcpy(p, g_DMA_rx_buffer + read_offset, num1);
-				memcpy(p, g_DMA_rx_buffer, len - num1);
+				memcpy(p + num1, g_DMA_rx_buffer, len - num1);
 				read_offset = len - num1;
 				old_page = DMA_rx_page;														/* updata the page */
 				DE_PRINTF("the data hasn't been coverted, but cross page,return len = %d \n", len);
@@ -341,29 +339,27 @@ u16 read_from_DMAbuffer(u8 *p, u32 len)
  */
 char uart2_send_data(u8 *buffer, u16 len)         
 {
-	NVIC_InitTypeDef NVIC_InitStructure;
-	if (DMA_usart_tx_flag) { 																	/* dma is busy, return 0 */
+	
+	if (DMA_GetFlagStatus(DMA1_FLAG_TC7) != RESET) { 																	/* dma is busy, return 0 */
+		
+		DMA_ClearFlag(DMA1_FLAG_TC7);																											/* clear dma transmit complete flag */ 
+		if (len < DMA_SENDBUFF_SIZE) {
+			
+			memcpy(g_DMA_tx_buffer, buffer, len);										/* copy the send data to the g_DMA_tx_buffer */
+			DMA_Cmd (USART2_DMA_CHAN_TX, DISABLE);	
+			DMA_SetCurrDataCounter(USART2_DMA_CHAN_TX, len);
+			DMA_Cmd (USART2_DMA_CHAN_TX, ENABLE);	
+			
+			return 1;
+		} else {
+			
+			return (char)-1;
+		}
+	} else {
 		return 0;
 	}
 	
-	if (len < DMA_SENDBUFF_SIZE) {
-		
-		memcpy(g_DMA_tx_buffer, buffer, len);										/* copy the send data to the g_DMA_tx_buffer */
-		USART2_tx_DMA_Config(len);															/* config usart2 dam and config the len */
-		
-				/* Enable the USARTy Interrupt */
-		NVIC_InitStructure.NVIC_IRQChannel = DMA1_Channel7_IRQn;	 
-		NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-		NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
-		NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-		NVIC_Init(&NVIC_InitStructure);
-		
-		DMA_usart_tx_flag = 1;																	/* to signal the data is transmitting */
-		return 1;
-	} else {
-		
-		return (char)-1;
-	}
+
 }
 
 /*********************************************END OF FILE**********************/

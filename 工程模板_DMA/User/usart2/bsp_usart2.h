@@ -13,7 +13,7 @@
 #define USART2_DMA_CHAN_RX DMA1_Channel6
 
 void USART2_Config(void);
-void USART2_tx_DMA_Config(u16 len);
+void USART2_tx_DMA_Config(void);
 void USART2_rx_DMA_Config(void);
 
 /**

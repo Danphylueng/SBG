@@ -23,7 +23,6 @@
 extern u8 _g_receive_buffer[RECEIVE_BUFFER_LEN];								/* a buffer to receive the data */
 extern u8 *p;																										/* a ponter point to the buffer to save data */
 extern u32 DMA_page;
-extern uint8_t _g_DMA_buffer[DMA_RECEIVEBUFF_SIZE];
 
 /**
   * @brief  Ö÷º¯Êý
@@ -35,10 +34,14 @@ int main(void)
 	u16 frame_length = 0;
 	u32 i;
 	u16 length;
+	
+	u8 test_buffer[122];
 
 	u32 timestick = 0;																							/* use to hold the timestick from frame */
-	u32 timestick_0x03, timestick_0x06, timestick_0x24, timestick_0x08;
-	u8 buffer[255];
+	u32 timestick_0x03 = 0,
+			timestick_0x06 = 0,
+			timestick_0x24 = 0,
+			timestick_0x08 = 0;
 	
 	sbg_data sbg_frame_data;									/* use to hold a frame except ETX SYN1 SYN2 CRC */
 #ifdef __DEBUG__
@@ -49,24 +52,9 @@ int main(void)
 	USART2_Config();
 	printf("test \n");
 	
-	sbg_frame_data.sbg_msg = 0x01;
-	sbg_frame_data.sbg_class = 0x02;
-	sbg_frame_data.sbg_len = 0x0A;
-	for (i = 0; i<0x0A; i++) {
-		
-		sbg_frame_data.sbg_data[i] = i;
+	for (i = 0; i<10; i++) {
+		while(uart2_send_data("test123\n", sizeof("test123\n")) != 1);
 	}
-	length = 0xff;
-	if (create_a_frame(buffer, sbg_frame_data, &length)) 
-	{
-		printf("create a frame success \r\n");
-	}
-	for (i = 0; i < 100; i++) {
-		while(uart2_send_data(buffer,length) != 1);
-	}
-
-	
-	
 	
 	i = 0;
 	
@@ -77,8 +65,9 @@ int main(void)
 		 ***********************************/
 #ifdef __DEBUG__
 		recenum = read_from_DMAbuffer(p, _g_receive_buffer + RECEIVE_BUFFER_LEN - p);
-		if(recenum > 800){
-			DE_PRINTF("receive num more than 800\n");
+		if(recenum > 255){
+			printf("er");
+			//DE_PRINTF("receive num more than 800\n");
 		}
 		p += recenum;
 #else
@@ -109,38 +98,50 @@ int main(void)
 					
 					case 0x03:																																	/* the time interval is 10000 us when the msg == 0x03 */
 						if (timestick_0x03 + 10000 != timestick && timestick_0x03 != 0) {					/* judge the time is corret or not expect timestick_0x03 ==0 */									
-							printf("03lost\n");
+							printf("03lost %d\n", timestick - timestick_0x03);
+							if (timestick - timestick_0x03 ==0) {
+								printf("bufflen %d ", p - _g_receive_buffer);
+							}
 						}
 						timestick_0x03 = timestick;
 						break;
 					
 					case 0x06: 																																	/* the time interval is 10000 us when the msg == 0x06 */
 						if (timestick_0x06 + 10000 != timestick && timestick_0x06 != 0) {					/* judge the time is corret or not expect timestick_0x06 ==0 */	
-							printf("06lost\n");					
+							printf("06lost %d\n", timestick - timestick_0x06);
+							if (timestick - timestick_0x06 ==0) {
+								printf("bufflen %d ", p - _g_receive_buffer);
+							}							
 						}
 						timestick_0x06 = timestick;
 						break;
 					
 					case 0x24: 																																	/* the time interval is 20000 us when the msg == 0x24 */
 						if (timestick_0x24 + 20000 != timestick && timestick_0x24 != 0) {					/* judge the time is corret or not expect timestick_0x24 ==0 */	
-							printf("24lost\n");
+							printf("24lost %d\n", timestick - timestick_0x24);
+							if (timestick - timestick_0x24 ==0) {
+								printf("bufflen %d ", p - _g_receive_buffer);
+							}
 						}
 						timestick_0x24 = timestick;						
 						break;
 					
 					case 0x08: 																																	/* the time interval is 40000 us when the msg == 0x08 */
 						if (timestick_0x08 + 40000 != timestick && timestick_0x08 != 0) {					/* judge the time is corret or not expect timestick_0x08 ==0 */	
-							printf("08lost\n");
+							printf("08lost %d\n", timestick - timestick_0x08);
+							if (timestick - timestick_0x08 ==0) {
+								printf("bufflen %d ", p - _g_receive_buffer);
+							}
 						}
 						timestick_0x08 = timestick;						
 						break;
 					
 					default:
-					
+
 						break;
 					}
 			}
-		} while (p - _g_receive_buffer > 200);
+		} while (p - _g_receive_buffer > 0xFF);
 	}
 		
 }
