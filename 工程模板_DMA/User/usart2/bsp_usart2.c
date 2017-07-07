@@ -239,8 +239,7 @@ u16 read_from_DMAbuffer(u8 *p, u32 len)
 			read_offset += num;
 			return num;
 		}
-	} else if ((old_page == 0xFF && DMA_rx_page == 0) || 
-							DMA_rx_page - old_page == 1) {						/*case is large than one page, in some case , we can still read the data.*/
+	} else if ( (u8)(old_page + 1) == DMA_rx_page) {						/*case is large than one page, in some case , we can still read the data.*/
 		
 		if (read_offset + DMA_GetCurrDataCounter(USART2_DMA_CHAN_RX) < DMA_RECEIVEBUFF_SIZE - 1) { /* this case is ,data is not value */
 			

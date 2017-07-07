@@ -29,7 +29,7 @@
 
 /* use to extern ReceiveBuff */
 //extern u8 *p;
-extern u32 DMA_rx_page;
+extern __IO u8 DMA_rx_page;
 extern u8 DMA_usart_tx_flag;
 
 /** @addtogroup STM32F10x_StdPeriph_Template
@@ -184,11 +184,7 @@ void SysTick_Handler(void)
 void DMA1_Channel6_IRQHandler(void)
 {
 	if (DMA_GetITStatus(DMA1_IT_TC6) == SET) {
-		if (DMA_rx_page == 0xFF) {
-			DMA_rx_page = 0;
-			DMA_ClearFlag(DMA1_IT_TC6);
-			return ;
-		}
+
 		DMA_rx_page++;
 		DMA_ClearFlag(DMA1_IT_TC6);
 	}

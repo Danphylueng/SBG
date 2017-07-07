@@ -22,7 +22,7 @@
 
 extern u8 _g_receive_buffer[RECEIVE_BUFFER_LEN];								/* a buffer to receive the data */
 extern u8 *p;																										/* a ponter point to the buffer to save data */
-extern u32 DMA_page;
+//extern u32 DMA_page;
 
 /**
   * @brief  Ö÷º¯Êý
